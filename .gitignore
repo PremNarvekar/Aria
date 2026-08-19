@@ -1,0 +1,69 @@
+# =========================
+# Environment & Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Python
+# =========================
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =========================
+# Node / React
+# =========================
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# =========================
+# ChromaDB / Local Data
+# =========================
+chroma/
+chromadb/
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Terraform
+# =========================
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# =========================
+# AWS / SSH
+# =========================
+*.pem
+*.key
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+*.log
