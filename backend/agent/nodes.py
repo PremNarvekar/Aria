@@ -312,8 +312,6 @@ Explain your decision briefly.
 
     
     # Deterministic safety rule
-    
-
     if decision.complete:
         is_complete = True
 
@@ -329,67 +327,3 @@ Explain your decision briefly.
         "research_iteration": iteration + 1,
     }
 
-def check_completeness(state: AgentState,) -> dict[str, Any]:
-
-    question = state["question"]
-
-    fetched_content = state.get(
-        "fetched_content",
-        [],
-    )
-
-    iteration, max_iterations = get_iteration_config(
-        state
-    )
-
-    research_context = build_research_context(
-        fetched_content
-    )
-
-    prompt = f"""
-You are Aria's research completeness evaluator.
-
-Original user question:
-
-{question}
-
-Research collected so far:
-
-{research_context}
-
-Determine whether the collected research is sufficient
-to answer the original question accurately and comprehensively.
-
-Evaluate:
-
-1. Relevance
-2. Coverage
-3. Source quality
-4. Missing important information
-5. Evidence supporting the answer
-
-Return complete=true ONLY if the available research
-is sufficient.
-
-If important information is still missing, return
-complete=false.
-
-Explain your decision briefly.
-"""
-
-    decision = completeness_llm.invoke(prompt)
-
-    if decision.complete:
-        is_complete = True
-
-    elif iteration >= max_iterations:
-        is_complete = True
-
-    else:
-        is_complete = False
-
-    return {
-        "is_complete": is_complete,
-        "completeness_reason": decision.reason,
-        "research_iteration": iteration + 1,
-    }
