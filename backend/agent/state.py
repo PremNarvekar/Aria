@@ -1,18 +1,65 @@
-from typing import TypedDict, List , Dict , Any 
+from typing import Annotated, Any, TypedDict
+import operator
 
-class AgentState(TypedDict, total=False ):
+
+class AgentState(TypedDict, total=False):
+    # -----------------------------
+    # User input
+    # -----------------------------
     question: str
-    search_queries: List[str]
-    search_results: List[Dict[str, Any]]
-    fetched_content: List[Dict[str , Any]]
+
+    # -----------------------------
+    # Research planning
+    # -----------------------------
+    search_queries: Annotated[
+        list[str],
+        operator.add,
+    ]
+
+    # -----------------------------
+    # Search results
+    # -----------------------------
+    search_results: Annotated[
+        list[dict[str, Any]],
+        operator.add,
+    ]
+
+    # -----------------------------
+    # Fetched web content
+    # -----------------------------
+    fetched_content: Annotated[
+        list[dict[str, Any]],
+        operator.add,
+    ]
+
+    # -----------------------------
+    # Fetch failures
+    # -----------------------------
+    failed_fetches: Annotated[
+        list[dict[str, Any]],
+        operator.add,
+    ]
+
+    # ----------------------------
+    # Research evaluation
+    # ----------------------------
+    research_complete: bool
+    completeness_reason: str
+    missing_aspects: list[str]
+
+    # -----------------------------
+    # Research control
+    # -----------------------------
+    research_iteration: int
+    max_iterations: int
+
+    max_sources: int
+
+    # -----------------------------
+    # Termination
+    # -----------------------------
+
+    research_terminated: bool
+    termination_reason: str
     
-    claims: List[Dict[str, Any]]
-    is_complete:bool
-    
-    research_iteration:int 
-    max_iteration: int
-    
-    final_report:Dict[str, Any]
-    
-    error:str
     

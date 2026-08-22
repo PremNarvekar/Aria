@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any
 
@@ -9,11 +10,12 @@ from .state import AgentState
 from .tools import tavily_search, fetch_page
 
 
-
+# ============================================================
 # Configuration
-
+# ============================================================
 
 load_dotenv()
+
 
 GEMINI_MODEL = os.getenv(
     "GEMINI_MODEL",
@@ -21,13 +23,20 @@ GEMINI_MODEL = os.getenv(
 )
 
 MAX_SEARCH_QUERIES = 5
-DEFAULT_MAX_ITERATIONS = 3
+MAX_RESULTS_PER_QUERY = 5
+
+DEFAULT_MAX_ITERATIONS = 40
+DEFAULT_MAX_SOURCES = 20
+
 MAX_CONTENT_PER_SOURCE = 12_000
 
+FETCH_CONCURRENCY = 8
+SEARCH_CONCURRENCY = 5
 
 
+# ============================================================
 # LLM
-
+# ============================================================
 
 llm = ChatGoogleGenerativeAI(
     model=GEMINI_MODEL,
@@ -36,50 +45,112 @@ llm = ChatGoogleGenerativeAI(
 )
 
 
-
+# ============================================================
 # Structured Outputs
+# ============================================================
+
+class SearchPlan(BaseModel):
+    queries: list[str] = Field(
+        description=(
+            "A list of distinct search queries that investigate "
+            "different aspects of the user's research question."
+        )
+    )
+
+
 class CompletenessDecision(BaseModel):
     complete: bool = Field(
         description=(
-            "True when the collected research is sufficient "
-            "to answer the user's question accurately."
+            "Whether the available research is sufficient "
+            "to answer the user's question."
         )
     )
 
     reason: str = Field(
         description=(
-            "Brief explanation describing why the research "
-            "is or is not sufficient."
+            "Short explanation of why the research is "
+            "complete or incomplete."
         )
     )
 
+    missing_aspects: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Important aspects that are still missing "
+            "from the research."
+        ),
+    )
+
+
+planner_llm = llm.with_structured_output(SearchPlan)
 
 completeness_llm = llm.with_structured_output(
     CompletenessDecision
 )
 
 
+# ============================================================
+# Helper: Normalize Query
+# ============================================================
 
-# Helper Functions
+def normalize_query(query: str) -> str:
+    """
+    Normalize a search query so we can detect duplicates.
+    """
+
+    return " ".join(
+        query.strip().lower().split()
+    )
+
+
+# ============================================================
+# Helper: Normalize URL
+# ============================================================
+
+def normalize_url(url: str) -> str:
+    """
+    Normalize URLs for basic duplicate detection.
+    """
+
+    return url.strip().rstrip("/")
+
+
+# ============================================================
+# Helper: Build Research Context
+# ============================================================
+
 def build_research_context(
     fetched_content: list[dict[str, Any]],
 ) -> str:
-    """
-    Convert fetched documents into a clean text context
-    that can be passed to the LLM.
-    """
 
     if not fetched_content:
         return "No research content has been collected yet."
 
     sources = []
 
-    for index, item in enumerate(fetched_content, start=1):
-        url = item.get("url", "")
-        title = item.get("title", "Untitled source")
-        content = item.get("content", "")
+    for index, item in enumerate(
+        fetched_content,
+        start=1,
+    ):
 
-        content = content[:MAX_CONTENT_PER_SOURCE]
+        title = item.get(
+            "title",
+            "Untitled source",
+        )
+
+        url = item.get(
+            "url",
+            "",
+        )
+
+        content = item.get(
+            "content",
+            "",
+        )
+
+        content = content[
+            :MAX_CONTENT_PER_SOURCE
+        ]
 
         sources.append(
             f"""
@@ -99,13 +170,13 @@ Content:
     return "\n\n".join(sources)
 
 
-def get_iteration_config(
+# ============================================================
+# Helper: Get Research Configuration
+# ============================================================
+
+def get_research_config(
     state: AgentState,
-) -> tuple[int, int]:
-    """
-    Read the current research iteration and maximum
-    allowed iterations from state.
-    """
+) -> tuple[int, int, int]:
 
     iteration = state.get(
         "research_iteration",
@@ -117,64 +188,133 @@ def get_iteration_config(
         DEFAULT_MAX_ITERATIONS,
     )
 
-    return iteration, max_iterations
+    max_sources = state.get(
+        "max_sources",
+        DEFAULT_MAX_SOURCES,
+    )
+
+    return (
+        iteration,
+        max_iterations,
+        max_sources,
+    )
 
 
-
+# ============================================================
 # Node 1 — Plan Research
+# ============================================================
 
-def plan_research(state: AgentState,) -> dict[str, Any]:
+def plan_research(
+    state: AgentState,
+) -> dict[str, Any]:
 
     question = state["question"]
 
-    prompt = f"""
-You are the research planning agent for Aria.
+    previous_queries = state.get(
+        "search_queries",
+        [],
+    )
 
-The user wants to research:
+    previous_queries_text = "\n".join(
+        f"- {query}"
+        for query in previous_queries
+    )
+
+    prompt = f"""
+You are Aria's research planning agent.
+
+User research question:
 
 {question}
 
-Generate {MAX_SEARCH_QUERIES} high-quality search queries.
+Previous searches already performed:
 
-Each query must investigate a DIFFERENT angle of the
-user's question.
+{previous_queries_text or "None"}
 
-Avoid generating multiple queries that search for the
-same information.
+Generate up to {MAX_SEARCH_QUERIES} NEW search queries.
 
-Think about useful angles such as:
+Requirements:
 
-- background
-- current information
-- technical details
-- business or market information
-- competitors
-- recent developments
-- primary sources
+- Each query must investigate a different angle.
+- Do not repeat previous queries.
+- Do not produce minor variations of previous queries.
+- Prioritize high-value information.
+- Cover important missing aspects.
+- Prefer primary or authoritative sources when appropriate.
 
-Return ONLY the search queries.
-
-One query per line.
+Return only structured search queries.
 """
 
-    response = llm.invoke(prompt)
+    plan = planner_llm.invoke(prompt)
 
-    queries = [
-        line.strip()
-        for line in response.content.splitlines()
-        if line.strip()
-    ]
+    previous_normalized = {
+        normalize_query(query)
+        for query in previous_queries
+    }
+
+    new_queries = []
+
+    for query in plan.queries:
+
+        normalized = normalize_query(query)
+
+        if not normalized:
+            continue
+
+        if normalized in previous_normalized:
+            continue
+
+        if normalized in {
+            normalize_query(q)
+            for q in new_queries
+        }:
+            continue
+
+        new_queries.append(
+            query.strip()
+        )
+
+        if len(new_queries) >= MAX_SEARCH_QUERIES:
+            break
 
     return {
-        "search_queries": queries[:MAX_SEARCH_QUERIES],
+        "search_queries": new_queries,
     }
 
 
-
+# ============================================================
 # Node 2 — Execute Research
+# ============================================================
+
+async def execute_single_search(
+    query: str,
+) -> list[dict[str, Any]]:
+
+    try:
+
+        results = await asyncio.to_thread(
+            tavily_search,
+            query=query,
+            max_results=MAX_RESULTS_PER_QUERY,
+        )
+
+        return [
+            {
+                "query": query,
+                "title": result.get("title"),
+                "url": result.get("url"),
+                "content": result.get("content"),
+                "score": result.get("score"),
+            }
+            for result in results
+        ]
+
+    except Exception:
+
+        return []
 
 
-def execute_research(
+async def execute_research(
     state: AgentState,
 ) -> dict[str, Any]:
 
@@ -183,34 +323,121 @@ def execute_research(
         [],
     )
 
-    all_results: list[dict[str, Any]] = []
+    existing_results = state.get(
+        "search_results",
+        [],
+    )
 
-    for query in queries:
-
-        results = tavily_search(
-            query=query,
-            max_results=5,
+    existing_urls = {
+        normalize_url(
+            result.get("url", "")
         )
+        for result in existing_results
+        if result.get("url")
+    }
+
+    semaphore = asyncio.Semaphore(
+        SEARCH_CONCURRENCY
+    )
+
+    async def limited_search(query: str):
+
+        async with semaphore:
+            return await execute_single_search(
+                query
+            )
+
+    results_by_query = await asyncio.gather(
+        *[
+            limited_search(query)
+            for query in queries
+        ]
+    )
+
+    new_results = []
+
+    seen_urls = set(
+        existing_urls
+    )
+
+    for results in results_by_query:
 
         for result in results:
 
-            all_results.append(
-                {
-                    "query": query,
-                    "title": result.get("title"),
-                    "url": result.get("url"),
-                    "content": result.get("content"),
-                    "score": result.get("score"),
-                }
+            url = result.get("url")
+
+            if not url:
+                continue
+
+            normalized_url = normalize_url(url)
+
+            if normalized_url in seen_urls:
+                continue
+
+            seen_urls.add(
+                normalized_url
+            )
+
+            new_results.append(
+                result
             )
 
     return {
-        "search_results": all_results,
+        "search_results": new_results,
     }
 
 
-
+# ============================================================
 # Node 3 — Fetch Content
+# ============================================================
+
+async def fetch_single_page(
+    result: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+
+    url = result.get("url")
+
+    if not url:
+        return None, None
+
+    try:
+
+        page = await fetch_page(url)
+
+        content = page.get(
+            "content",
+            "",
+        )
+
+        if not content:
+            return (
+                None,
+                {
+                    "url": url,
+                    "reason": "empty_content",
+                },
+            )
+
+        return (
+            {
+                "url": url,
+                "title": result.get("title"),
+                "content": content,
+                "query": result.get("query"),
+                "score": result.get("score"),
+            },
+            None,
+        )
+
+    except Exception as exc:
+
+        return (
+            None,
+            {
+                "url": url,
+                "reason": str(exc),
+            },
+        )
 
 
 async def fetch_content(
@@ -222,38 +449,66 @@ async def fetch_content(
         [],
     )
 
-    fetched: list[dict[str, Any]] = []
+    existing_content = state.get(
+        "fetched_content",
+        [],
+    )
 
-    for result in results:
-
-        url = result.get("url")
-
-        if not url:
-            continue
-
-        page = await fetch_page(url)
-
-        if not page.get("content"):
-            continue
-
-        fetched.append(
-            {
-                "url": url,
-                "title": result.get("title"),
-                "content": page["content"],
-                "query": result.get("query"),
-                "score": result.get("score"),
-            }
+    existing_urls = {
+        normalize_url(
+            item.get("url", "")
         )
+        for item in existing_content
+        if item.get("url")
+    }
+
+    results_to_fetch = [
+        result
+        for result in results
+        if result.get("url")
+        and normalize_url(
+            result["url"]
+        ) not in existing_urls
+    ]
+
+    semaphore = asyncio.Semaphore(
+        FETCH_CONCURRENCY
+    )
+
+    async def limited_fetch(result):
+
+        async with semaphore:
+            return await fetch_single_page(
+                result
+            )
+
+    responses = await asyncio.gather(
+        *[
+            limited_fetch(result)
+            for result in results_to_fetch
+        ]
+    )
+
+    fetched = []
+    failures = []
+
+    for content, failure in responses:
+
+        if content:
+            fetched.append(content)
+
+        if failure:
+            failures.append(failure)
 
     return {
         "fetched_content": fetched,
+        "failed_fetches": failures,
     }
 
 
-
+# ============================================================
 # Node 4 — Check Completeness
-
+# ============================================================
 
 def check_completeness(
     state: AgentState,
@@ -266,8 +521,8 @@ def check_completeness(
         [],
     )
 
-    iteration, max_iterations = get_iteration_config(
-        state
+    iteration, max_iterations, max_sources = (
+        get_research_config(state)
     )
 
     research_context = build_research_context(
@@ -277,11 +532,11 @@ def check_completeness(
     prompt = f"""
 You are Aria's research completeness evaluator.
 
-Original user question:
+Original question:
 
 {question}
 
-Research collected so far:
+Research collected:
 
 {research_context}
 
@@ -294,36 +549,67 @@ Evaluate:
 1. Relevance
 2. Coverage
 3. Source quality
-4. Missing important information
-5. Evidence supporting the answer
+4. Source diversity
+5. Evidence quality
+6. Missing important aspects
 
-Return complete=true ONLY if the available research
-is sufficient.
+Return complete=true only when the available research
+is genuinely sufficient.
 
-If important information is still missing, return
-complete=false.
+If important information is missing:
 
-Explain your decision briefly.
+- return complete=false
+- identify the missing aspects
+
+Do not judge completeness based only on the number
+of sources.
 """
 
     decision = completeness_llm.invoke(
         prompt
     )
 
-    
-    # Deterministic safety rule
+    current_source_count = len(
+        fetched_content
+    )
+
+    reached_iteration_limit = (
+        iteration >= max_iterations
+    )
+
+    reached_source_limit = (
+        current_source_count >= max_sources
+    )
+
     if decision.complete:
-        is_complete = True
-
-    elif iteration >= max_iterations:
-        is_complete = True
-
-    else:
-        is_complete = False
-
+        
+        research_complete = True
+        research_terminated = True
+        termination_reason = "research_complete"
+        
+    elif reached_iteration_limit:
+        research_complete = False
+        research_terminated = True 
+        termination_reason = "max_iterations"
+        
+    elif reached_source_limit:
+        research_complete = False
+        research_terminated = True 
+        termination_reason = "max_sources"
+        
+    else : 
+        research_complete = False 
+        research_terminated = False
+        termination_reason = "more_research_needed"
+        
     return {
-        "is_complete": is_complete,
+        "research_complete": research_complete,
         "completeness_reason": decision.reason,
-        "research_iteration": iteration + 1,
+        "missing_aspects":decision.missing_aspects,
+        "research_iteration":iteration + 1,
+        "research_terminated":research_terminated,
+        "termination_reason":termination_reason
+        
     }
+        
 
