@@ -11,6 +11,7 @@ from .nodes import (
     execute_research,
     fetch_content,
     check_completeness,
+    extract_claims,
 )
 
 
@@ -41,9 +42,9 @@ def build_research_graph():
         AgentState
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # Nodes
-    # --------------------------------------------------------
+    # ========================================================
 
     workflow.add_node(
         "plan_research",
@@ -65,9 +66,14 @@ def build_research_graph():
         check_completeness,
     )
 
-    # --------------------------------------------------------
-    # Initial flow
-    # --------------------------------------------------------
+    workflow.add_node(
+        "extract_claims",
+        extract_claims,
+    )
+
+    # ========================================================
+    # Initial Research Flow
+    # ========================================================
 
     workflow.add_edge(
         START,
@@ -89,20 +95,33 @@ def build_research_graph():
         "check_completeness",
     )
 
-    # --------------------------------------------------------
-    # Research loop
-    # --------------------------------------------------------
+    # ========================================================
+    # Research Loop
+    # ========================================================
 
     workflow.add_conditional_edges(
         "check_completeness",
         route_after_completeness,
         {
             "research_again": "plan_research",
-            "complete": END,
+            "complete": "extract_claims",
         },
+    )
+
+    # ========================================================
+    # Finish
+    # ========================================================
+
+    workflow.add_edge(
+        "extract_claims",
+        END,
     )
 
     return workflow.compile()
 
+
+# ============================================================
+# Compiled Research Graph
+# ============================================================
 
 research_graph = build_research_graph()

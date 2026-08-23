@@ -39,6 +39,14 @@ class AgentState(TypedDict, total=False):
         list[dict[str, Any]],
         operator.add,
     ]
+    
+    # ---------------------------
+    # Extracted Claims 
+    
+    claims:Annotated[
+        list[dict[str, Any]],
+        operator.add,
+    ]
 
     # ----------------------------
     # Research evaluation

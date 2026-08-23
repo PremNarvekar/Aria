@@ -25,13 +25,17 @@ GEMINI_MODEL = os.getenv(
 MAX_SEARCH_QUERIES = 5
 MAX_RESULTS_PER_QUERY = 5
 
-DEFAULT_MAX_ITERATIONS = 40
+DEFAULT_MAX_ITERATIONS = 5
 DEFAULT_MAX_SOURCES = 20
 
 MAX_CONTENT_PER_SOURCE = 12_000
 
 FETCH_CONCURRENCY = 8
 SEARCH_CONCURRENCY = 5
+
+MAX_CLAIMS_PER_SOURCE = 10
+MAX_CLAIM_CONTENT = 10_000
+CLAIM_CONCURRENCY = 5
 
 
 # ============================================================
@@ -88,6 +92,41 @@ completeness_llm = llm.with_structured_output(
     CompletenessDecision
 )
 
+class Claim(BaseModel):
+    
+    statement: str =Field(
+        description=(
+            "A factual statement directly support"
+            "by the provided source"
+        )
+    )
+    
+    evidence:str = Field(
+        description=(
+            "A short excerpt or precise evidence from "
+            "the source supporting the claim"
+        )
+    )
+    
+    claim_type:str = Field(
+        description=(
+            "Category of the claim such as policy "
+            "market, company , technology, financial",
+            "competition or other"
+        )
+    )
+    
+class SourceClaims(BaseModel):
+    claims: list[Claim]= Field(
+        description=(
+            "Factual claims extracted only from the"
+            "provided source. "
+        )
+    )
+    
+claims_llm = llm.with_structured_output(
+    SourceClaims
+)
 
 # ============================================================
 # Helper: Normalize Query
@@ -613,3 +652,49 @@ of sources.
     }
         
 
+async def extract_claims(
+    state: AgentState,
+    
+)-> dict[str, Any]:
+    
+    
+    fetched_content= state.get(
+        "fetched_content",
+        [],
+    )
+    
+    if not fetched_content:
+        return {
+            "claims":[],
+        }
+        
+    semaphore = asyncio.Semaphore(
+        CLAIM_CONCURRENCY
+    )
+    
+    async def limited_extraction(
+        source: dict[str , Any],
+        
+    )-> list[dict[str, Any]]:
+        
+        async with semaphore:
+            
+            return await extract_claims_from_source(
+                source 
+            )
+            
+        result = await asyncio.gather(
+            *[
+              limited_extraction(source)
+              for source in fetched_content
+              ]
+        )
+        
+        claims: list[dict[str, Any]] = []
+        
+        for source_claims in results:
+            claims.extend(source_claims)
+            
+        return {
+            "claims":claims
+        }
