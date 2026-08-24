@@ -71,3 +71,10 @@ class AgentState(TypedDict, total=False):
     termination_reason: str
     
     
+    # -----------------------------
+    # Report
+    # ----------------------------
+    
+    report: dict[str, Any]
+    
+

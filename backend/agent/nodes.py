@@ -9,6 +9,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from .state import AgentState
 from .tools import tavily_search, fetch_page
 
+from ..models import ResearchReport
+
 
 # ============================================================
 # Configuration
@@ -48,6 +50,9 @@ llm = ChatGoogleGenerativeAI(
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
 
+report_llm = llm.with_structured_output(
+    ResearchReport 
+)
 
 # ============================================================
 # Structured Outputs
@@ -551,7 +556,7 @@ async def fetch_content(
 
 def check_completeness(
     state: AgentState,
-) -> dict[str, Any]:
+    ) -> dict[str, Any]:
 
     question = state["question"]
 
@@ -655,9 +660,9 @@ of sources.
 async def extract_claims(
     state: AgentState,
     
-)-> dict[str, Any]:
+    )-> dict[str, Any]:
     
-    
+
     fetched_content= state.get(
         "fetched_content",
         [],
@@ -698,3 +703,68 @@ async def extract_claims(
         return {
             "claims":claims
         }
+        
+        
+def synthesise(
+    state: AgentState,
+) -> dict[dict, Any]:
+    
+    question = state['question']
+    
+    claims = state.get(
+        "claims",
+        [],
+    )
+    
+    if not claims:
+        return{
+            "report":None,
+        }
+        
+    evidence = "\n\n".join(
+    f"""
+CLAIM:
+{claim.get("statement", "")}
+
+EVIDENCE:
+{claim.get("evidence", "")}
+
+SOURCE:
+{claim.get("source_title", "")}
+
+URL:
+{claim.get("source_url", "")}
+
+"""
+        for claim in claims 
+    )
+    prompt = f"""
+You are Aria's research synthesis agent.
+
+USER QUESTION:
+{question}
+
+EXTRACTED EVIDENCE:
+{evidence}
+
+Create a research report answering the user's
+question using ONLY the supplied evidence.
+
+Rules:
+
+1. Do not invent facts.
+2. Do not introduce information not present
+   in the supplied claims.
+3. Every important factual finding must be
+   supported by the supplied evidence.
+4. Keep the analysis directly relevant to
+   the user's question.
+5. Preserve source attribution.
+6. If the evidence is insufficient, say so.
+"""
+    report = report_llm.invoke(
+        prompt
+    )
+    return {
+        "report":report.model_dump()
+    }

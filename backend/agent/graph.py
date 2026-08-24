@@ -12,6 +12,7 @@ from .nodes import (
     fetch_content,
     check_completeness,
     extract_claims,
+    synthesise
 )
 
 
@@ -70,6 +71,11 @@ def build_research_graph():
         "extract_claims",
         extract_claims,
     )
+    
+    workflow.add_node(
+        "synthesise",
+        synthesise
+    )
 
     # ========================================================
     # Initial Research Flow
@@ -114,7 +120,13 @@ def build_research_graph():
 
     workflow.add_edge(
         "extract_claims",
-        END,
+        "synthesise"
+        
+    )
+    
+    workflow.add_edge(
+        "synthesise",
+        END
     )
 
     return workflow.compile()
