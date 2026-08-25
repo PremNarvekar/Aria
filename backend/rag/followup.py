@@ -167,6 +167,7 @@ CONTENT:
 
 def answer_followup(
     question: str,
+    research_id: str,
     top_k: int = DEFAULT_TOP_K,
 ) -> dict[str, Any]:
 
@@ -184,6 +185,7 @@ def answer_followup(
 
     documents = search_research(
         query=question,
+        research_id=research_id,
         k=top_k,
     )
 

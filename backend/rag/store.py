@@ -46,9 +46,10 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 def build_documents(
     fetched_content: list[dict[str, Any]],
+    research_id:str
 ) -> list[Document]:
 
-    documents = []
+    documents: list[Document] = []
 
     for source in fetched_content:
 
@@ -70,6 +71,7 @@ def build_documents(
                 Document(
                     page_content=chunk,
                     metadata={
+                        "research_id":research_id,
                         "source_url": source.get(
                             "url",
                             "",
@@ -100,10 +102,12 @@ def get_vector_store() -> Chroma:
 
 def index_research(
     fetched_content: list[dict[str, Any]],
-) -> Chroma:
+    research_id: str
+) -> int:
 
     documents = build_documents(
-        fetched_content
+        fetched_content=fetched_content,
+        research_id= research_id
     )
 
     if not documents:
@@ -117,17 +121,26 @@ def index_research(
         documents
     )
 
-    return vector_store
+    return len(documents)
 
 
 def search_research(
     query: str,
+    research_id:str,
     k: int = 5,
 ) -> list[Document]:
+    
+    if not research_id:
+        raise ValueError(
+            "research_id is required for research retrieval. "
+        )
 
     vector_store = get_vector_store()
 
     return vector_store.similarity_search(
-        query,
+        query=query,
         k=k,
+        filter={
+            "research_id":research_id
+        }
     )
