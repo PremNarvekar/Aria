@@ -11,6 +11,9 @@ from .tools import tavily_search, fetch_page
 
 from ..models import ResearchReport
 
+from ..rag.store import index_research as index_research_document
+from ..rag.session import create_research_id
+
 
 # ============================================================
 # Configuration
@@ -657,57 +660,131 @@ of sources.
     }
         
 
+async def extract_claims_from_source(
+    source: dict[str, Any],
+) -> list[dict[str, Any]]:
+
+    title = source.get(
+        "title",
+        "Untitled source",
+    )
+
+    url = source.get(
+        "url",
+        "",
+    )
+
+    content = source.get(
+        "content",
+        "",
+    )[:MAX_CLAIM_CONTENT]
+
+    if not content:
+        return []
+
+    prompt = f"""
+You are Aria's evidence extraction agent.
+
+Extract factual claims supported ONLY by this source.
+
+SOURCE TITLE:
+{title}
+
+SOURCE URL:
+{url}
+
+SOURCE CONTENT:
+{content}
+
+Rules:
+
+1. Extract only claims supported by this source.
+2. Do not invent information.
+3. Do not combine information from other sources.
+4. Do not make assumptions.
+5. Each claim must be independently understandable.
+6. Include concise evidence supporting each claim.
+7. Prefer specific factual claims over vague statements.
+8. Do not extract opinions unless clearly identified.
+9. Ignore navigation, advertisements, cookie notices,
+   and unrelated page content.
+
+Return structured claims only.
+"""
+
+    try:
+        result = await asyncio.to_thread(
+            claims_llm.invoke,
+            prompt,
+        )
+
+        claims = result.claims[
+            :MAX_CLAIMS_PER_SOURCE
+        ]
+
+        return [
+            {
+                "statement": claim.statement,
+                "evidence": claim.evidence,
+                "claim_type": claim.claim_type,
+                "source_url": url,
+                "source_title": title,
+            }
+            for claim in claims
+        ]
+
+    except Exception as exc:
+        print(
+            f"Claim extraction failed for {url}: {exc}"
+        )
+        return []
+
+
 async def extract_claims(
     state: AgentState,
-    
-    )-> dict[str, Any]:
-    
+) -> dict[str, Any]:
 
-    fetched_content= state.get(
+    fetched_content = state.get(
         "fetched_content",
         [],
     )
-    
+
     if not fetched_content:
         return {
-            "claims":[],
+            "claims": [],
         }
-        
+
     semaphore = asyncio.Semaphore(
         CLAIM_CONCURRENCY
     )
-    
+
     async def limited_extraction(
-        source: dict[str , Any],
-        
-    )-> list[dict[str, Any]]:
-        
+        source: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+
         async with semaphore:
-            
             return await extract_claims_from_source(
-                source 
+                source
             )
-            
-        result = await asyncio.gather(
-            *[
-              limited_extraction(source)
-              for source in fetched_content
-              ]
-        )
-        
-        claims: list[dict[str, Any]] = []
-        
-        for source_claims in results:
-            claims.extend(source_claims)
-            
-        return {
-            "claims":claims
-        }
-        
-        
+
+    results = await asyncio.gather(
+        *[
+            limited_extraction(source)
+            for source in fetched_content
+        ]
+    )
+
+    claims: list[dict[str, Any]] = []
+
+    for source_claims in results:
+        claims.extend(source_claims)
+
+    return {
+        "claims": claims,
+    }
 def synthesise(
     state: AgentState,
-) -> dict[dict, Any]:
+) -> dict[str, Any]:
     
     question = state['question']
     
@@ -767,4 +844,56 @@ Rules:
     )
     return {
         "report":report.model_dump()
+    }
+
+
+def index_research(
+    state: AgentState
+) -> dict[str, Any]:
+    
+    fetched_content = state.get(
+        "fetched_content",
+        "",
+    )
+    
+    research_id = state.get(
+        "research_id",
+        "",
+    )
+    
+    if not research_id:
+        raise ValueError(
+            "research_id is required before indexing research. "
+        )
+        
+    if not fetched_content:
+        return {
+            "indexed_chunks":0,
+            "rag_indexed": False,
+        }
+        
+    indexed_chunks = index_research_documents(
+        fetched_content=fetched_content,
+        research_id= research_id,
+    
+    )
+    
+    return {
+        "indexed_chunks":indexed_chunks,
+        "rag_indexed":True
+    }
+    
+def initialize_research(
+    state: AgentState,
+) -> dict[str, Any]:
+
+    research_id = state.get("research_id")
+
+    if research_id:
+        return {
+            "research_id": research_id,
+        }
+
+    return {
+        "research_id": create_research_id(),
     }

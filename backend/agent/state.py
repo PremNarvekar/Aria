@@ -77,4 +77,8 @@ class AgentState(TypedDict, total=False):
     
     report: dict[str, Any]
     
+    # RAG
+    indexed_chunks: int
+    rag_indexed: bool
+    
 
