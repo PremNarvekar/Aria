@@ -11,7 +11,7 @@ from .tools import tavily_search, fetch_page
 
 from ..models import ResearchReport
 
-from ..rag.store import index_research as index_research_document
+from ..rag.store import index_research as index_research_documents
 from ..rag.session import create_research_id
 
 

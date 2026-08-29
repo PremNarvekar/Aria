@@ -100,6 +100,11 @@ def get_vector_store() -> Chroma:
     )
 
 
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
 def index_research(
     fetched_content: list[dict[str, Any]],
     research_id: str
@@ -107,7 +112,7 @@ def index_research(
 
     documents = build_documents(
         fetched_content=fetched_content,
-        research_id= research_id
+        research_id=research_id
     )
 
     if not documents:
@@ -117,9 +122,20 @@ def index_research(
 
     vector_store = get_vector_store()
 
-    vector_store.add_documents(
-        documents
-    )
+    # RAG Hardening: Batch uploads to prevent API timeouts,
+    # PayloadTooLarge errors, and Embedding rate limits.
+    BATCH_SIZE = 100
+    
+    for i in range(0, len(documents), BATCH_SIZE):
+        batch = documents[i : i + BATCH_SIZE]
+        logger.info(f"Indexing batch {i//BATCH_SIZE + 1} of {(len(documents)-1)//BATCH_SIZE + 1} ({len(batch)} documents)")
+        
+        # Add documents in batches
+        vector_store.add_documents(batch)
+        
+        # Small delay to respect embedding API rate limits
+        if i + BATCH_SIZE < len(documents):
+            time.sleep(1.5)
 
     return len(documents)
 

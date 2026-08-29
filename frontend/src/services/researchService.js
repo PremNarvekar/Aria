@@ -1,100 +1,111 @@
-import { MOCK_SESSIONS } from './mockData';
-
-// Delay helper to simulate network latency
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// We assume the FastAPI backend runs on localhost:8000
+const API_BASE = "http://127.0.0.1:8000/api";
+const TEST_TOKEN = "test-user-123"; // Dummy token for Milestone 11 Auth
 
 export const researchService = {
+  
+  // NOTE: getSessions() isn't implemented in the backend yet, 
+  // so we will just return empty or you can mock it.
   async getSessions() {
-    await delay(600);
-    return MOCK_SESSIONS;
+    return [];
   },
 
   async getSession(id) {
-    await delay(400);
-    return MOCK_SESSIONS.find(s => s.id === id);
+    const response = await fetch(`${API_BASE}/research/${id}`, {
+      headers: {
+        "Authorization": `Bearer ${TEST_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch session: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Map backend response to UI structure
+    const rawReport = data.report || {};
+    return {
+      id: data.research_id,
+      question: data.question,
+      status: data.status,
+      summary: rawReport.executive_summary || "",
+      findings: rawReport.key_finding || [],
+      claims: [], 
+      sources: rawReport.sources || [],
+      report: rawReport.analysis || "",
+      createdAt: data.created_at || new Date().toISOString()
+    };
   },
 
   async startResearch(question, onProgress) {
-    // Simulate the research pipeline
-    const sessionId = `session_${Date.now()}`;
-    
-    const steps = [
-      "Understanding research question...",
-      "Planning research angles...",
-      "Searching the web...",
-      "Fetching relevant web pages...",
-      "Analyzing sources...",
-      "Checking research completeness...",
-      "Extracting factual claims...",
-      "Building evidence...",
-      "Preparing report..."
-    ];
+    // 1. Trigger the research POST request
+    const response = await fetch(`${API_BASE}/research`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${TEST_TOKEN}`
+      },
+      body: JSON.stringify({ question })
+    });
 
-    for (const step of steps) {
-      onProgress(step);
-      // Random delay between 800ms and 2000ms for realism
-      await delay(Math.floor(Math.random() * 1200) + 800); 
+    if (!response.ok) {
+      throw new Error(`Failed to start research: ${response.statusText}`);
     }
 
-    // Return a new mock session
-    const newSession = {
-      id: sessionId,
-      question,
-      createdAt: new Date().toISOString(),
-      status: "complete",
-      summary: "This is a dynamically generated mock summary for the query. In a real environment, the backend would synthesize the research report and key findings from the vector database.",
-      findings: [
-        "First key finding extracted from the research context.",
-        "Second major point of evidence discovered during analysis.",
-        "A counter-perspective or market risk associated with the query."
-      ],
-      claims: [
-        {
-          id: "c_new_1",
-          text: "The subject possesses significant market potential based on recent growth vectors.",
-          evidence: "Market analysis indicates a 40% YoY expansion in the primary target sector.",
-          sourceId: "src_new_1"
+    const data = await response.json();
+    const sessionId = data.research_id;
+
+    // 2. Connect to the SSE Stream to listen for live updates
+    return new Promise((resolve, reject) => {
+      // EventSource doesn't support Authorization header, so we pass it in query
+      const eventSource = new EventSource(`${API_BASE}/research/${sessionId}/stream?token=${TEST_TOKEN}`);
+
+      let finalReport = null;
+      let finalStatus = "running";
+      let error = null;
+
+      eventSource.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          
+          if (parsed.type === "node_completed") {
+            onProgress(parsed.label || `Completed: ${parsed.node}`);
+          } 
+          else if (parsed.type === "research_completed") {
+            finalStatus = "completed";
+            const rawReport = parsed.report || {};
+            
+            eventSource.close();
+            
+            // Resolve the promise mapping backend model to frontend UI props
+            resolve({
+              id: sessionId,
+              question: question,
+              status: finalStatus,
+              summary: rawReport.executive_summary || "Research completed successfully.",
+              findings: rawReport.key_finding || [],
+              claims: parsed.claims || [], // Provided if we want to pass them later
+              sources: rawReport.sources || [],
+              report: rawReport.analysis || "No detailed analysis provided.",
+              createdAt: new Date().toISOString()
+            });
+          }
+          else if (parsed.type === "research_failed") {
+            finalStatus = "failed";
+            error = parsed.error;
+            eventSource.close();
+            reject(new Error(error || "Research failed"));
+          }
+        } catch (e) {
+          console.error("Error parsing SSE data", e);
         }
-      ],
-      sources: [
-        {
-          id: "src_new_1",
-          title: "Global Market Analysis Report",
-          domain: "research.net",
-          url: "https://research.net/analysis",
-          relevance: 0.95,
-          description: "Detailed overview of sector growth and technological trends.",
-          type: "Industry Report"
-        },
-        {
-          id: "src_new_2",
-          title: "Technical Review of Current Capabilities",
-          domain: "techinsights.com",
-          url: "https://techinsights.com/review",
-          relevance: 0.88,
-          description: "Deep dive into the architectural and strategic advantages.",
-          type: "Technical Analysis"
-        }
-      ],
-      report: `
-## Executive Summary
-This report was generated in response to the query: "${question}". It outlines the primary considerations, technological developments, and strategic market positioning related to the topic.
+      };
 
-## Key Insights
-The investigation reveals a rapidly evolving landscape characterized by intense competition and significant capital investment. The core technologies are reaching maturity, enabling broader enterprise adoption.
-
-## Market Dynamics
-Current trajectories indicate a consolidation phase, where established players are leveraging their existing ecosystems to create high switching costs. Emerging competitors are primarily focusing on specialized niches or offering disruptive pricing models.
-
-## Conclusion
-The strategic importance of this sector cannot be overstated. Future developments will likely hinge on software-defined capabilities and the integration of next-generation processing architectures.
-      `,
-      followUpHistory: []
-    };
-
-    // Add to mock db
-    MOCK_SESSIONS.unshift(newSession);
-
-    return newSession;
+      eventSource.onerror = (err) => {
+        console.error("SSE Error:", err);
+        // Only close if it's a fatal error, browsers often auto-reconnect SSE
+      };
+    });
   }
 };

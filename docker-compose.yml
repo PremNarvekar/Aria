@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: aria-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    restart: unless-stopped
+
+  api:
+    build: 
+      context: ./backend
+    container_name: aria-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - CHROMA_API_KEY=${CHROMA_API_KEY}
+      - CHROMA_TENANT=${CHROMA_TENANT}
+      - CHROMA_DATABASE=${CHROMA_DATABASE}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build:
+      context: ./backend
+    container_name: aria-worker
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - CHROMA_API_KEY=${CHROMA_API_KEY}
+      - CHROMA_TENANT=${CHROMA_TENANT}
+      - CHROMA_DATABASE=${CHROMA_DATABASE}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    command: celery -A backend.worker.celery_app worker --loglevel=info
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: aria-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  redis_data:

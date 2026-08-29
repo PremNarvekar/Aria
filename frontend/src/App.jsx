@@ -57,24 +57,29 @@ function App() {
   );
 
   const renderHome = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in w-full bg-grain relative">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in w-full bg-white relative overflow-hidden">
       
-      <div className="relative z-10 w-full max-w-3xl mx-auto px-4 md:px-8 py-16">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-sans font-semibold text-gray-900 leading-tight tracking-tight mb-4">
+      {/* Background Dots */}
+      <div className="absolute inset-0 bg-dots opacity-40 pointer-events-none"></div>
+
+      {/* Subtle Glows */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gray-100 rounded-full blur-[100px] opacity-50 pointer-events-none"></div>
+
+      <div className="relative z-10 w-full max-w-2xl mx-auto px-4 md:px-8 py-16">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl md:text-[2.75rem] font-sans font-medium text-gray-900 leading-tight tracking-tight mb-4">
             Research with clarity.
           </h1>
-          <p className="text-gray-500 font-sans text-lg max-w-lg mx-auto leading-relaxed">
+          <p className="text-gray-500 font-sans text-lg max-w-md mx-auto leading-relaxed font-light">
             Transform complex data into clear, engaging insights. Everything you need in one place.
           </p>
         </div>
 
-        <div className="w-full max-w-2xl mx-auto">
+        <div className="w-full max-w-xl mx-auto">
           <QueryInput onSubmit={handleStartResearch} />
           
           <div className="mt-12 flex flex-col items-center">
-            <p className="text-xs text-gray-400 mb-6 font-medium">Try asking about</p>
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap justify-center gap-2">
               {[
                 "NVIDIA's AI strategy",
                 "India's semiconductor ecosystem",
@@ -83,7 +88,7 @@ function App() {
                 <button 
                   key={q} 
                   onClick={() => handleStartResearch(q)}
-                  className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-full text-sm text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-all shadow-sm"
+                  className="px-4 py-2 bg-gray-50 border border-gray-100/60 rounded-full text-[13px] font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 hover:border-gray-200 transition-all duration-300"
                 >
                   {q}
                 </button>
