@@ -14,6 +14,7 @@ services:
   api:
     build: 
       context: ./backend
+    image: aria-api:optimized
     container_name: aria-api
     ports:
       - "8000:8000"
@@ -33,6 +34,7 @@ services:
   worker:
     build:
       context: ./backend
+    image: aria-worker:optimized
     container_name: aria-worker
     environment:
       - DATABASE_URL=${DATABASE_URL}
@@ -50,6 +52,7 @@ services:
   frontend:
     build:
       context: ./frontend
+    image: aria-frontend:optimized
     container_name: aria-frontend
     ports:
       - "5173:80"
