@@ -1,28 +1,24 @@
-import { MOCK_SESSIONS } from './mockData';
-
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 export const followupService = {
   async askQuestion(sessionId, question) {
-    await delay(1500); // Simulate thinking time
-    
-    const session = MOCK_SESSIONS.find(s => s.id === sessionId);
-    if (!session) throw new Error("Session not found");
+    const response = await fetch(`/api/research/${sessionId}/followup?token=test-user-123`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ question })
+    });
 
-    const answer = {
+    if (!response.ok) {
+      throw new Error(`Follow-up failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    return {
       id: `msg_${Date.now()}`,
       role: "assistant",
-      text: `Based on the research context, here is an analysis of your question: "${question}".\n\nThe ecosystem is characterized by rapid innovation. The current data strongly suggests that integrated architectures are providing significant performance advantages over traditional disjointed systems. Furthermore, market adoption metrics indicate a growing preference for solutions that offer both hardware and software synergies.`,
-      sources: session.sources.length > 0 ? [session.sources[0].id] : []
+      text: data.answer,
+      sources: data.sources || []
     };
-
-    session.followUpHistory.push({
-      id: `msg_u_${Date.now()}`,
-      role: "user",
-      text: question
-    });
-    session.followUpHistory.push(answer);
-
-    return answer;
   }
 };

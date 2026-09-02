@@ -120,3 +120,30 @@ async def get_research(
         ),
         error=session.get("error"),
     )
+
+
+class FollowUpRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=1000)
+
+@router.post(
+    "/{research_id}/followup",
+    response_model=dict,
+)
+async def ask_followup(
+    research_id: str,
+    request: FollowUpRequest,
+    user_id: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    session = await get_research_session(
+        research_id=research_id,
+        user_id=user_id,
+    )
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Research session not found.",
+        )
+    
+    from ..rag.followup import followup_service
+    answer = await followup_service.answer(research_id, request.question)
+    return answer
