@@ -24,7 +24,7 @@ load_dotenv()
 
 GEMINI_MODEL = os.getenv(
     "GEMINI_MODEL",
-    "gemini-2.5-flash",
+    "gemini-3.5-flash",
 )
 
 MAX_SEARCH_QUERIES = 5
@@ -853,7 +853,7 @@ def index_research(
     
     fetched_content = state.get(
         "fetched_content",
-        "",
+        [],
     )
     
     research_id = state.get(

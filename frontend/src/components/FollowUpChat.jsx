@@ -15,7 +15,7 @@ export default function FollowUpChat({ session, setSession }) {
     setIsSending(true);
 
     try {
-      const updatedSession = await followupService.askFollowUp(session.id, userMessage);
+      const updatedSession = await followupService.askQuestion(session.id, userMessage);
       setSession({ ...updatedSession });
     } catch (err) {
       console.error(err);

@@ -86,7 +86,7 @@ async def event_stream(
 
     # 3. Otherwise, subscribe to the live in-memory event stream
     history = await research_events.get_history(research_id)
-    pubsub = await research_events.subscribe(research_id)
+    queue = await research_events.subscribe(research_id)
 
     try:
         for event in history:
@@ -95,25 +95,19 @@ async def event_stream(
                 return
 
         while True:
-            # get_message returns None if timeout is reached
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, 
-                timeout=15.0
-            )
-
-            if message is None:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=15.0)
+            except asyncio.TimeoutError:
                 yield ": heartbeat\n\n"
                 continue
 
-            event = json.loads(message["data"])
             yield format_event(event)
 
             if event.get("type") in {"research_completed", "research_failed"}:
                 break
 
     finally:
-        await pubsub.unsubscribe()
-        await pubsub.close()
+        await research_events.unsubscribe(research_id, queue)
 
 
 @router.get("/{research_id}/stream")

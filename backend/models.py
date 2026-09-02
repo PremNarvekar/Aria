@@ -10,8 +10,8 @@ class ResearchReport(BaseModel):
         description="A concise summary answering the user's research question. "
     )
     
-    key_finding:list[str] = Field(
-        description= "The most important factual findings from the research. "
+    key_findings: list[str] = Field(
+        description="The most important factual findings from the research. "
         
     )
     analysis:str = Field(

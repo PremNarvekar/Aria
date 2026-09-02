@@ -20,11 +20,12 @@ export default {
           700: 'rgb(var(--color-text) / <alpha-value>)',
           800: 'rgb(var(--color-text) / <alpha-value>)',
           900: 'rgb(var(--color-text) / <alpha-value>)',
-          950: 'rgb(var(--color-bg) / <alpha-value>)',
+          950: 'rgb(var(--color-text-strong) / <alpha-value>)',
         }
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+        pixel: ['DotGothic16', 'monospace'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

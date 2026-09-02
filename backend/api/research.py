@@ -22,7 +22,7 @@ router = APIRouter(
 
 class ResearchRequest(BaseModel):
     question: str = Field(
-        min_length=5,
+        min_length=2,
         max_length=1000,
     )
 
@@ -67,10 +67,11 @@ async def create_research(
 
     research_id = session["research_id"]
 
-    # Send to Celery worker instead of running in the local FastAPI event loop
-    execute_research_task.delay(
-        session["research_id"],
-        request.question,
+    # Local dev mode: run in-process (no Redis/Celery needed)
+    import asyncio
+    from ..worker.tasks import async_run_research
+    asyncio.create_task(
+        async_run_research(research_id, request.question)
     )
 
     return ResearchResponse(

@@ -1,5 +1,23 @@
 # Kubernetes Deployment Manifests for ARIA Project
 
+# --- Secret (placeholder — create with: kubectl create secret generic aria-secrets --from-env-file=.env) ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aria-secrets
+type: Opaque
+stringData:
+  DATABASE_URL: "REPLACE_ME"
+  REDIS_URL: "redis://redis:6379/0"
+  GEMINI_API_KEY: "REPLACE_ME"
+  TAVILY_API_KEY: "REPLACE_ME"
+  CHROMA_API_KEY: "REPLACE_ME"
+  CHROMA_TENANT: "REPLACE_ME"
+  CHROMA_DATABASE: "REPLACE_ME"
+  GEMINI_EMBEDDING_MODEL: "gemini-embedding-001"
+
+---
+# --- Redis ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,6 +36,24 @@ spec:
         image: redis:7-alpine
         ports:
         - containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
 
 ---
 apiVersion: v1
@@ -31,6 +67,7 @@ spec:
     app: aria-redis
 
 ---
+# --- API ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,11 +85,18 @@ spec:
       containers:
       - name: api
         image: YOUR_REGISTRY/aria-api:optimized
+        command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
         ports:
         - containerPort: 8000
         envFrom:
         - secretRef:
             name: aria-secrets
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 15
 
 ---
 apiVersion: v1
@@ -60,13 +104,13 @@ kind: Service
 metadata:
   name: aria-api
 spec:
-  type: LoadBalancer
   ports:
   - port: 8000
   selector:
     app: aria-api
 
 ---
+# --- Worker ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -84,11 +128,13 @@ spec:
       containers:
       - name: worker
         image: YOUR_REGISTRY/aria-worker:optimized
+        command: ["celery", "-A", "backend.worker.celery_app", "worker", "--loglevel=info"]
         envFrom:
         - secretRef:
             name: aria-secrets
 
 ---
+# --- Frontend ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -110,13 +156,30 @@ spec:
         - containerPort: 80
 
 ---
-apiVersion: v1
-kind: Service
+# --- Ingress (single entry point) ---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: aria-frontend
+  name: aria-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
 spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-  selector:
-    app: aria-frontend
+  rules:
+  - host: aria.yourdomain.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: aria-api
+            port:
+              number: 8000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: aria-frontend
+            port:
+              number: 80

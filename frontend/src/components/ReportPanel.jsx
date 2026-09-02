@@ -21,25 +21,27 @@ export default function ReportPanel({ session }) {
     <div ref={containerRef} className="space-y-24">
       
       {/* Executive Summary */}
-      <section className="report-section">
-        <p className="text-gray-900 text-xl md:text-2xl leading-[1.6] font-medium tracking-tight">
+      <section className="report-section pt-12 border-t border-gray-200 relative">
+        {/* Subtle grid in background of summary */}
+        <div className="absolute inset-0 bg-dots opacity-20 pointer-events-none -z-10"></div>
+        <p className="text-gray-900 text-2xl md:text-3xl leading-[1.4] font-sans font-light tracking-tight">
           {session.summary}
         </p>
       </section>
 
-      {/* Key Findings */}
+      {/* Key Findings with huge dot-matrix numbers */}
       {session.findings && session.findings.length > 0 && (
-        <section className="report-section pt-12 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-10">Key Findings</h3>
+        <section className="report-section pt-12 border-t border-gray-200">
+          <h3 className="text-xs font-pixel text-gray-400 uppercase tracking-widest mb-12">Key Findings</h3>
           
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-12">
             {session.findings.map((finding, idx) => (
-              <div key={idx} className="flex gap-6">
-                <div className="w-8 shrink-0 flex justify-center mt-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+              <div key={idx} className="flex flex-col md:flex-row gap-6 md:gap-12 items-start">
+                <div className="md:w-32 shrink-0">
+                  <span className="font-pixel text-5xl md:text-6xl text-gray-900 leading-none">0{idx + 1}</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-gray-800 leading-relaxed font-medium text-lg">{finding}</p>
+                  <p className="text-gray-800 leading-relaxed font-sans font-light text-xl md:text-2xl">{finding}</p>
                 </div>
               </div>
             ))}
@@ -49,20 +51,22 @@ export default function ReportPanel({ session }) {
 
       {/* Evidence & Claims */}
       {session.claims && session.claims.length > 0 && (
-        <section className="report-section pt-12 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-10">Evidence Verification</h3>
+        <section className="report-section pt-12 border-t border-gray-200">
+          <h3 className="text-xs font-pixel text-gray-400 uppercase tracking-widest mb-12">Evidence Verification</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200 border border-gray-200 rounded-sm overflow-hidden">
             {session.claims.map((claim, idx) => (
-              <div key={claim.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100/50 hover:shadow-sm transition-shadow">
-                <div className="flex items-center gap-3 mb-4">
-                  <Shield className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Verified Claim</span>
+              <div key={claim.id} className="bg-white p-8 hover:bg-gray-50/50 transition-colors">
+                <div className="flex items-center gap-3 mb-6">
+                  <Shield className="w-4 h-4 text-gray-900" />
+                  <span className="text-xs font-pixel text-gray-900 uppercase tracking-wider">Verified Claim</span>
                 </div>
-                <p className="font-semibold text-gray-900 mb-3 leading-snug">{claim.text}</p>
-                <p className="text-sm text-gray-500 font-medium leading-relaxed italic border-l-2 border-gray-200 pl-4">
-                  "{claim.evidence}"
-                </p>
+                <p className="font-sans font-medium text-gray-900 mb-6 leading-relaxed text-lg">{claim.text}</p>
+                <div className="border-l-2 border-gray-900 pl-4">
+                  <p className="text-sm text-gray-500 font-sans font-light leading-relaxed italic">
+                    "{claim.evidence}"
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -70,23 +74,23 @@ export default function ReportPanel({ session }) {
       )}
 
       {/* Full Report */}
-      <section className="report-section pt-12 border-t border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-10">Full Analysis</h3>
+      <section className="report-section pt-12 border-t border-gray-200">
+        <h3 className="text-xs font-pixel text-gray-400 uppercase tracking-widest mb-12">Full Analysis</h3>
         
-        <div className="prose prose-gray prose-lg max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-blue-600 hover:prose-a:text-blue-500">
+        <div className="prose prose-gray prose-lg max-w-none prose-headings:font-sans prose-headings:font-light prose-headings:tracking-tight prose-a:text-blue-600 hover:prose-a:text-blue-500">
           {session.report.split('\n').map((line, i) => {
             if (line.startsWith('## ')) {
-              return <h2 key={i} className="mt-16 mb-6 text-2xl text-gray-900">{line.replace('## ', '')}</h2>;
+              return <h2 key={i} className="mt-16 mb-8 text-3xl text-gray-900">{line.replace('## ', '')}</h2>;
             } else if (line.startsWith('- ')) {
               const content = line.replace('- ', '');
               const parts = content.split(/\*\*(.*?)\*\*/g);
               return (
-                <li key={i} className="mb-3 text-gray-700 leading-relaxed font-medium">
-                  {parts.map((part, j) => j % 2 === 1 ? <strong key={j} className="text-gray-900">{part}</strong> : part)}
+                <li key={i} className="mb-4 text-gray-700 leading-relaxed font-sans font-light">
+                  {parts.map((part, j) => j % 2 === 1 ? <strong key={j} className="text-gray-900 font-medium">{part}</strong> : part)}
                 </li>
               );
             } else if (line.trim() !== '') {
-              return <p key={i} className="mb-6 text-gray-700 leading-relaxed font-medium">{line}</p>;
+              return <p key={i} className="mb-6 text-gray-700 leading-relaxed font-sans font-light">{line}</p>;
             }
             return null;
           })}

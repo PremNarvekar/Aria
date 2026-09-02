@@ -1,5 +1,5 @@
-// We assume the FastAPI backend runs on localhost:8000
-const API_BASE = "http://127.0.0.1:8000/api";
+// Use Vite env variable in production, fallback to localhost for dev
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 const TEST_TOKEN = "test-user-123"; // Dummy token for Milestone 11 Auth
 
 export const researchService = {
@@ -30,7 +30,7 @@ export const researchService = {
       question: data.question,
       status: data.status,
       summary: rawReport.executive_summary || "",
-      findings: rawReport.key_finding || [],
+      findings: rawReport.key_findings || [],
       claims: [], 
       sources: rawReport.sources || [],
       report: rawReport.analysis || "",
@@ -84,7 +84,7 @@ export const researchService = {
               question: question,
               status: finalStatus,
               summary: rawReport.executive_summary || "Research completed successfully.",
-              findings: rawReport.key_finding || [],
+              findings: rawReport.key_findings || [],
               claims: parsed.claims || [], // Provided if we want to pass them later
               sources: rawReport.sources || [],
               report: rawReport.analysis || "No detailed analysis provided.",

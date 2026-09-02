@@ -26,6 +26,7 @@ services:
       - CHROMA_API_KEY=${CHROMA_API_KEY}
       - CHROMA_TENANT=${CHROMA_TENANT}
       - CHROMA_DATABASE=${CHROMA_DATABASE}
+      - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL}
     depends_on:
       - redis
     restart: unless-stopped
@@ -44,6 +45,7 @@ services:
       - CHROMA_API_KEY=${CHROMA_API_KEY}
       - CHROMA_TENANT=${CHROMA_TENANT}
       - CHROMA_DATABASE=${CHROMA_DATABASE}
+      - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL}
     depends_on:
       - redis
     restart: unless-stopped

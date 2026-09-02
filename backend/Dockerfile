@@ -36,8 +36,9 @@ COPY . /app
 RUN chown -R appuser:appuser /app
 USER appuser
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=2)" || exit 1
+# Healthcheck — lightweight check that Python and app module load correctly.
+# Works for both API (uvicorn) and Worker (celery) containers.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD python -c "import backend.main" || exit 1
 
 # Runtime commands via docker-compose.yml (uvicorn or celery)
