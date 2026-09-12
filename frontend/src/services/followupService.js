@@ -1,6 +1,8 @@
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
+
 export const followupService = {
   async askQuestion(sessionId, question) {
-    const response = await fetch(`/api/research/${sessionId}/followup?token=test-user-123`, {
+    const response = await fetch(`${API_BASE}/research/${sessionId}/followup?token=test-user-123`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

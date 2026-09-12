@@ -38,8 +38,7 @@ class ResearchResponse(BaseModel):
     error: str | None = None
 
 
-# The heavy research execution has been moved to backend.worker.tasks
-from ..worker.tasks import execute_research_task
+
 
 
 @router.post(
