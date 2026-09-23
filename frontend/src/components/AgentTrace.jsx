@@ -41,7 +41,7 @@ export default function AgentTrace({ currentStep }) {
   };
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-8 md:p-20 relative min-h-[600px]">
+    <div className="w-full flex flex-col items-center justify-center p-8 md:p-20 relative min-h-[600px] bg-dots">
       
       {/* Node Graph */}
       <div className="relative w-full max-w-3xl mb-16 md:mb-24">
@@ -116,7 +116,7 @@ export default function AgentTrace({ currentStep }) {
 
       <div className="text-center z-10 px-4">
         <h2 
-          className="text-xl md:text-4xl font-pixel tracking-tighter uppercase mb-4"
+          className="text-xl md:text-4xl font-pixel tracking-[0.1em] uppercase mb-4"
           style={{ color: 'rgb(var(--color-text))' }}
         >
           SIMULATING RUN
@@ -124,7 +124,7 @@ export default function AgentTrace({ currentStep }) {
         
         <div className="h-6 overflow-hidden mb-8 flex justify-center w-full">
           <p 
-            className="text-xs md:text-sm font-sans font-light text-center"
+            className="text-xs md:text-sm font-sans font-light text-center tracking-wide"
             style={{ color: 'rgb(var(--color-text-muted))' }}
           >
             {currentStep || "Initializing autonomous agents..."}

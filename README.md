@@ -59,7 +59,7 @@ graph TD
 We specifically architected Aria to reduce latency in agentic workflows. Instead of standard sequential LLM chains, we achieved massive speed increases through:
 
 1. **Massive Concurrency:** All web scraping and claim extraction nodes run concurrently using Python's `asyncio.gather` and semaphores, allowing us to process 20+ sources in parallel rather than blocking sequentially.
-2. **High-Throughput Reasoning:** We utilize `gemini-3.5-flash` as the core reasoning engine. By moving to the Flash tier, we dramatically cut down generation time while maintaining structured Pydantic output capabilities.
+2. **High-Throughput Reasoning:** We utilize `Llama 3.1 70B` as the core reasoning engine. By moving to the Flash tier, we dramatically cut down generation time while maintaining structured Pydantic output capabilities.
 3. **In-Memory Event Queues:** For local execution, the backend bypasses Redis and Celery, using native Python `asyncio.Queue` to push state changes to the Server-Sent Events (SSE) endpoint with zero networking overhead. 
 4. **Optimized Frontend Rendering:** The UI utilizes `framer-motion` for fluid state transitions and hardware-accelerated SVG animations, ensuring that the heavy DOM updates from the streaming report do not drop frames.
 
@@ -75,7 +75,7 @@ We specifically architected Aria to reduce latency in agentic workflows. Instead
 - Python 3.12
 - FastAPI & Uvicorn
 - LangGraph (Agent Orchestration)
-- Google GenAI SDK (Gemini 3.5 Flash)
+- Groq API (Llama 3.1 70B via Langchain)
 - PostgreSQL + asyncpg + SQLAlchemy (State persistence)
 - ChromaDB (RAG Vector Store for follow-ups)
 
@@ -96,7 +96,7 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # Create a .env file with:
-# GEMINI_API_KEY=...
+# GROQ_API_KEY=...
 # TAVILY_API_KEY=...
 # DATABASE_URL=postgresql+asyncpg://...
 

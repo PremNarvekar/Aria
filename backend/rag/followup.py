@@ -1,16 +1,18 @@
 from typing import Any
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 
 from .store import get_vector_store
+import os
 
 
 class FollowUpService:
 
     def __init__(self) -> None:
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+        self.llm = ChatGroq(
+            model="llama-3.1-8b-instant", # using smaller model for fast RAG chat
             temperature=0,
+            api_key=os.getenv("GROQ_API_KEY"),
         )
 
     async def answer(

@@ -4,7 +4,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 
 from .state import AgentState
 from .tools import tavily_search, fetch_page
@@ -22,9 +22,9 @@ from ..rag.session import create_research_id
 load_dotenv()
 
 
-GEMINI_MODEL = os.getenv(
-    "GEMINI_MODEL",
-    "gemini-3.5-flash",
+GROQ_MODEL = os.getenv(
+    "GROQ_MODEL",
+    "llama-3.1-70b-versatile",
 )
 
 MAX_SEARCH_QUERIES = 5
@@ -47,10 +47,10 @@ CLAIM_CONCURRENCY = 5
 # LLM
 # ============================================================
 
-llm = ChatGoogleGenerativeAI(
-    model=GEMINI_MODEL,
+llm = ChatGroq(
+    model=GROQ_MODEL,
     temperature=0,
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+    api_key=os.getenv("GROQ_API_KEY"),
 )
 
 report_llm = llm.with_structured_output(

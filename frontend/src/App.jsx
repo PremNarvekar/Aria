@@ -84,7 +84,7 @@ function App() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 1, ease: "easeOut" }}
-            className="text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem] font-pixel text-gray-900 leading-[0.9] tracking-tighter mb-8 md:mb-12"
+            className="text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem] font-pixel text-[rgb(var(--color-text))] leading-[1] tracking-[0.1em] mb-8 md:mb-12"
           >
             SYNTHESIZE.<br/>RESEARCH.<br/>DISCOVER.
           </motion.h1>
