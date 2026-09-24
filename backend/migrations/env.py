@@ -36,6 +36,8 @@ if not db_url:
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+db_url = db_url.replace("sslmode=require", "ssl=require")
+
 config.set_main_option("sqlalchemy.url", db_url)
 
 def run_migrations_offline() -> None:
