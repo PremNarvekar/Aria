@@ -7,7 +7,7 @@ from langchain_core.documents import Document
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from .embeddings import embeddings
+from .embeddings import get_embeddings
 
 
 load_dotenv()
@@ -96,7 +96,7 @@ def get_vector_store() -> Chroma:
     return Chroma(
         client=chroma_client,
         collection_name=COLLECTION_NAME,
-        embedding_function=embeddings,
+        embedding_function=get_embeddings(),
     )
 
 
