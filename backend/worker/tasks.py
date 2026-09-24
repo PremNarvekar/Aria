@@ -1,14 +1,13 @@
 import asyncio
 from typing import Any
-from backend.worker.celery_app import celery_app
 from backend.agent.graph import research_graph
 from backend.services.research_store import update_research_session
 from backend.services.research_event import research_events
 
 
 async def async_run_research(research_id: str, question: str) -> None:
-    """The core asynchronous research workflow."""
-    
+    """Run the LangGraph research pipeline asynchronously (in-process)."""
+
     await update_research_session(
         research_id,
         status="running",
@@ -74,6 +73,7 @@ async def async_run_research(research_id: str, question: str) -> None:
             {
                 "type": "research_completed",
                 "research_id": research_id,
+                "report": final_state.get("report"),
             },
         )
 
@@ -107,12 +107,3 @@ async def async_run_research(research_id: str, question: str) -> None:
                 "error": "Research execution failed.",
             },
         )
-
-
-@celery_app.task(name="backend.worker.tasks.execute_research_task")
-def execute_research_task(research_id: str, question: str):
-    """
-    Synchronous Celery task wrapper that runs the async research loop.
-    Celery workers call this function.
-    """
-    asyncio.run(async_run_research(research_id, question))

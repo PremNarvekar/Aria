@@ -66,8 +66,7 @@ async def create_research(
 
     research_id = session["research_id"]
 
-    # Local dev mode: run in-process (no Redis/Celery needed)
-    import asyncio
+    # Run research pipeline in-process (no external worker needed)
     from ..worker.tasks import async_run_research
     asyncio.create_task(
         async_run_research(research_id, request.question)

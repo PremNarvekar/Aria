@@ -58,53 +58,55 @@ export const researchService = {
 
     // 2. Connect to the SSE Stream to listen for live updates
     return new Promise((resolve, reject) => {
-      // EventSource doesn't support Authorization header, so we pass it in query
       const eventSource = new EventSource(`${API_BASE}/research/${sessionId}/stream?token=${TEST_TOKEN}`);
 
-      let finalReport = null;
-      let finalStatus = "running";
-      let error = null;
+      eventSource.addEventListener("connected", (e) => {
+        console.log("SSE connected:", JSON.parse(e.data));
+      });
 
-      eventSource.onmessage = (event) => {
+      eventSource.addEventListener("node_completed", (e) => {
         try {
-          const parsed = JSON.parse(event.data);
-          
-          if (parsed.type === "node_completed") {
-            onProgress(parsed.label || `Completed: ${parsed.node}`);
-          } 
-          else if (parsed.type === "research_completed") {
-            finalStatus = "completed";
-            const rawReport = parsed.report || {};
-            
-            eventSource.close();
-            
-            // Resolve the promise mapping backend model to frontend UI props
-            resolve({
-              id: sessionId,
-              question: question,
-              status: finalStatus,
-              summary: rawReport.executive_summary || "Research completed successfully.",
-              findings: rawReport.key_findings || [],
-              claims: parsed.claims || [], // Provided if we want to pass them later
-              sources: rawReport.sources || [],
-              report: rawReport.analysis || "No detailed analysis provided.",
-              createdAt: new Date().toISOString()
-            });
-          }
-          else if (parsed.type === "research_failed") {
-            finalStatus = "failed";
-            error = parsed.error;
-            eventSource.close();
-            reject(new Error(error || "Research failed"));
-          }
-        } catch (e) {
-          console.error("Error parsing SSE data", e);
+          const parsed = JSON.parse(e.data);
+          onProgress(parsed.label || `Completed: ${parsed.node}`);
+        } catch (err) {
+          console.error("Error parsing node_completed", err);
         }
-      };
+      });
+
+      eventSource.addEventListener("research_completed", (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          const rawReport = parsed.report || {};
+          eventSource.close();
+          resolve({
+            id: sessionId,
+            question: question,
+            status: "completed",
+            summary: rawReport.executive_summary || "Research completed successfully.",
+            findings: rawReport.key_findings || [],
+            claims: parsed.claims || [],
+            sources: rawReport.sources || [],
+            report: rawReport.analysis || "No detailed analysis provided.",
+            createdAt: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error("Error parsing research_completed", err);
+        }
+      });
+
+      eventSource.addEventListener("research_failed", (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          eventSource.close();
+          reject(new Error(parsed.error || "Research failed"));
+        } catch (err) {
+          eventSource.close();
+          reject(new Error("Research failed"));
+        }
+      });
 
       eventSource.onerror = (err) => {
-        console.error("SSE Error:", err);
-        // Only close if it's a fatal error, browsers often auto-reconnect SSE
+        console.error("SSE connection error:", err);
       };
     });
   }

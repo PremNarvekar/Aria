@@ -10,7 +10,7 @@ class FollowUpService:
 
     def __init__(self) -> None:
         self.llm = ChatGroq(
-            model="llama-3.1-8b-instant", # using smaller model for fast RAG chat
+            model="qwen/qwen3.8-27b",
             temperature=0,
             api_key=os.getenv("GROQ_API_KEY"),
         )

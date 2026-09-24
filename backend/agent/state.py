@@ -80,5 +80,6 @@ class AgentState(TypedDict, total=False):
     # RAG
     indexed_chunks: int
     rag_indexed: bool
+    research_id: str
     
 

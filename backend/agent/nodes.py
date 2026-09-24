@@ -24,23 +24,23 @@ load_dotenv()
 
 GROQ_MODEL = os.getenv(
     "GROQ_MODEL",
-    "llama-3.1-70b-versatile",
+    "qwen/qwen3.8-27b",
 )
 
-MAX_SEARCH_QUERIES = 5
-MAX_RESULTS_PER_QUERY = 5
+MAX_SEARCH_QUERIES = 3
+MAX_RESULTS_PER_QUERY = 3
 
-DEFAULT_MAX_ITERATIONS = 5
-DEFAULT_MAX_SOURCES = 20
+DEFAULT_MAX_ITERATIONS = 2
+DEFAULT_MAX_SOURCES = 6
 
-MAX_CONTENT_PER_SOURCE = 12_000
+MAX_CONTENT_PER_SOURCE = 1_500
 
-FETCH_CONCURRENCY = 8
-SEARCH_CONCURRENCY = 5
+FETCH_CONCURRENCY = 4
+SEARCH_CONCURRENCY = 3
 
-MAX_CLAIMS_PER_SOURCE = 10
-MAX_CLAIM_CONTENT = 10_000
-CLAIM_CONCURRENCY = 5
+MAX_CLAIMS_PER_SOURCE = 5
+MAX_CLAIM_CONTENT = 1_500
+CLAIM_CONCURRENCY = 3
 
 
 # ============================================================
@@ -119,7 +119,7 @@ class Claim(BaseModel):
     claim_type:str = Field(
         description=(
             "Category of the claim such as policy "
-            "market, company , technology, financial",
+            "market, company , technology, financial "
             "competition or other"
         )
     )
@@ -561,102 +561,18 @@ def check_completeness(
     state: AgentState,
     ) -> dict[str, Any]:
 
-    question = state["question"]
-
-    fetched_content = state.get(
-        "fetched_content",
-        [],
-    )
-
     iteration, max_iterations, max_sources = (
         get_research_config(state)
     )
 
-    research_context = build_research_context(
-        fetched_content
-    )
-
-    prompt = f"""
-You are Aria's research completeness evaluator.
-
-Original question:
-
-{question}
-
-Research collected:
-
-{research_context}
-
-Determine whether the collected research is sufficient
-to answer the original question accurately and
-comprehensively.
-
-Evaluate:
-
-1. Relevance
-2. Coverage
-3. Source quality
-4. Source diversity
-5. Evidence quality
-6. Missing important aspects
-
-Return complete=true only when the available research
-is genuinely sufficient.
-
-If important information is missing:
-
-- return complete=false
-- identify the missing aspects
-
-Do not judge completeness based only on the number
-of sources.
-"""
-
-    decision = completeness_llm.invoke(
-        prompt
-    )
-
-    current_source_count = len(
-        fetched_content
-    )
-
-    reached_iteration_limit = (
-        iteration >= max_iterations
-    )
-
-    reached_source_limit = (
-        current_source_count >= max_sources
-    )
-
-    if decision.complete:
-        
-        research_complete = True
-        research_terminated = True
-        termination_reason = "research_complete"
-        
-    elif reached_iteration_limit:
-        research_complete = False
-        research_terminated = True 
-        termination_reason = "max_iterations"
-        
-    elif reached_source_limit:
-        research_complete = False
-        research_terminated = True 
-        termination_reason = "max_sources"
-        
-    else : 
-        research_complete = False 
-        research_terminated = False
-        termination_reason = "more_research_needed"
-        
+    # On Groq free tier, always complete after first pass to avoid token limits
     return {
-        "research_complete": research_complete,
-        "completeness_reason": decision.reason,
-        "missing_aspects":decision.missing_aspects,
-        "research_iteration":iteration + 1,
-        "research_terminated":research_terminated,
-        "termination_reason":termination_reason
-        
+        "research_complete": True,
+        "completeness_reason": "Single-pass research completed.",
+        "missing_aspects": [],
+        "research_iteration": iteration + 1,
+        "research_terminated": True,
+        "termination_reason": "research_complete",
     }
         
 
