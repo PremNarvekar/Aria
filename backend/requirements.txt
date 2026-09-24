@@ -15,10 +15,10 @@ langsmith
 langchain-groq
 langchain-chroma
 langchain-text-splitters
-langchain-huggingface
-sentence-transformers
+langchain-community
 
-# Embeddings & Vector DB
+# Embeddings (Lightweight ONNX - No PyTorch)
+fastembed
 chromadb
 numpy
 

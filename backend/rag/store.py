@@ -27,7 +27,7 @@ CHROMA_DATABASE = os.getenv(
 
 COLLECTION_NAME = os.getenv(
     "CHROMA_COLLECTION",
-    "aria_research_v2",
+    "aria_research_v3",
 )
 
 
