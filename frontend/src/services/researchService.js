@@ -1,5 +1,5 @@
-// Use Vite env variable in production, fallback to localhost for dev
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+// Use Vite env variable in production, fallback to direct Render backend to avoid Netlify proxy SSE buffering
+const API_BASE = import.meta.env.VITE_API_URL || "https://aria-backend-n6kc.onrender.com/api";
 const TEST_TOKEN = "test-user-123"; // Dummy token for Milestone 11 Auth
 
 export const researchService = {
