@@ -31,6 +31,11 @@ target_metadata = Base.metadata
 db_url = os.environ.get("DATABASE_URL")
 if not db_url:
     raise RuntimeError("DATABASE_URL environment variable is not set")
+
+# Force the asyncpg driver
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 config.set_main_option("sqlalchemy.url", db_url)
 
 def run_migrations_offline() -> None:
