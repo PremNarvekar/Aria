@@ -1,0 +1,59 @@
+name: Deploy Backend to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          # Tags the image with both 'latest' and the specific git commit hash
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/aria-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/aria-backend:${{ github.sha }}
+
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }} # Usually 'ubuntu' or 'ec2-user'
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Pull the absolute latest image we just built
+            docker pull ${{ secrets.DOCKER_USERNAME }}/aria-backend:latest
+            
+            # 2. Stop and remove the old running container (if it exists)
+            docker stop aria-backend || true
+            docker rm aria-backend || true
+            
+            # 3. Start the new container with production environment variables
+            # Note: In reality, you'd store these in an .env file on the EC2 machine
+            docker run -d \
+              --name aria-backend \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              --env-file /home/${{ secrets.EC2_USERNAME }}/.env \
+              ${{ secrets.DOCKER_USERNAME }}/aria-backend:latest
+            
+            # 4. Clean up old unused Docker images to save EC2 disk space
+            docker image prune -af
